@@ -597,7 +597,7 @@ if uploaded_file is not None:
             red_podataka["Sveukupno Očekivano (€)"] = round(
                 očekivano_sveukupno, 2
             )
-            red_podataka["Ima Dodatnych Usluga"] = postoji_dodatna_naplata
+            red_podataka["Ima Dodatnih Usluga"] = postoji_dodatna_naplata
 
             rezultati.append(red_podataka)
 
