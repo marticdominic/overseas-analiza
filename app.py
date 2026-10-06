@@ -49,8 +49,7 @@ except Exception as e:
 
 st.title("📦 Sustav za Kontrolu i Analizu Logističkih Računa")
 st.write(
-    "Učitaj mjesečnu tablicu pošiljaka. Cjenik je uvećan za 5%, a tranzit se "
-    "automatski kontrolira prema ugovorenim rokovima."
+    "Automatska kontrola troškova prijevoza, dodataka za gorivo i povrata paleta prema ugovornim uvjetima."
 )
 
 
@@ -201,12 +200,11 @@ def izracunaj_osnovnu_cijenu(masa, zona):
     else:
         baza = z_tablica[50.0]
         višak = masa - 50.0
-        # Zaokruživanje viška na viši cijeli broj (npr. 13.18 -> 14)
         višak_zaokružen = math.ceil(višak)
         dodatak_po_kg = (
             cijena_preko_50_z1 if zona == "Zona 1" else cijena_preko_50_z2
         )
-        osnova = baza + višak_zaokružen * dodaturak_po_kg if 'dodaturak_po_kg' in locals() else baza + višak_zaokružen * dodatak_po_kg
+        osnova = baza + višak_zaokružen * dodatak_po_kg
 
     if zona == "Zona 3":
         osnova = osnova * 1.25
@@ -636,13 +634,14 @@ if uploaded_file is not None:
             posto_goriva,
         )
 
-        tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-            "📊 1. Izvještaj: Tranzit i rokovi isporuke",
-            "⚖️ 2. Izvještaj: Usporedba svih cijena",
-            "🚨 3. Izvještaj: Samo razlike i preplate",
-            "📈 4. Izvještaj: Zbirne sume fakture",
-            "🛠️ 5. Izvještaj: Dodatne usluge",
-            "📄 6. Izvještaj: PDF Sažetak (Tranzit i Gorivo)",
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+            "📊 1. Tranzit i rokovi",
+            "⚖️ 2. Usporedba cijena",
+            "🚨 3. Preplate",
+            "📈 4. Zbirne sume",
+            "🛠️ 5. Dodatne usluge",
+            "📄 6. PDF Sažetak",
+            "📊 7. Vizualna Analitika",
         ])
 
         with tab1:
@@ -716,8 +715,7 @@ if uploaded_file is not None:
 
         with tab4:
             st.subheader(
-                "📈 Zbirni financijski pregled cijele fakture (Sve cijene bez"
-                " PDV-a)"
+                "📈 Zbirni financijski pregled cijele fakture (Sve cijene bez PDV-a)"
             )
             uk_naplaceni_transport_val = res_df[
                 "Naplaćeni Transport (€)"
@@ -807,8 +805,7 @@ if uploaded_file is not None:
             dodatne_df = res_df[res_df["Ima Dodatnih Usluga"] == True]
             if dodatne_df.empty:
                 st.success(
-                    "Nema pošiljaka s naplaćenim dodatnim uslugama u ovoj"
-                    " tablici!"
+                    "Nema pošiljaka s naplaćenim dodatnim uslugama u ovoj tablici!"
                 )
             else:
                 st.write(
@@ -853,3 +850,58 @@ if uploaded_file is not None:
                 file_name="sazetak_kontrole_fakture.pdf",
                 mime="application/pdf",
             )
+
+        with tab7:
+            st.subheader("📊 Vizualna Analitika i Pregled Fakture")
+            
+            # Izračun vrijednosti za KPI kartice
+            uk_bez_pdv = sveukupno_naplaceno_racun
+            pdv_iznos = uk_bez_pdv * 0.25
+            uk_s_pdv = uk_bez_pdv + pdv_iznos
+            uk_stavki = len(res_df)
+
+            kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+            kpi1.metric("Ukupno bez PDV-a", f"{uk_bez_pdv:,.2f} EUR")
+            kpi2.metric("Ukupno PDV (25%)", f"{pdv_iznos:,.2f} EUR")
+            kpi3.metric("Ukupno s PDV-om", f"{uk_s_pdv:,.2f} EUR")
+            kpi4.metric("Ukupno stavki", f"{uk_stavki}")
+
+            st.markdown("---")
+
+            col_chart1, col_chart2 = st.columns(2)
+
+            with col_chart1:
+                st.markdown("### Troškovi po vrsti usluge")
+                # Priprema podataka za krafna / pie chart
+                palete_val = res_df["RTSC - Naplaćeno (€)"].sum() if "RTSC - Naplaćeno (€)" in res_df.columns else 0.0
+                cod_val = res_df["CODC - Naplaćeno (€)"].sum() if "CODC - Naplaćeno (€)" in res_df.columns else 0.0
+                
+                df_usluge_chart = pd.DataFrame({
+                    "Usluga": ["PRIJEVOZ POŠILJAKA - EXPRESS", "DODATEK - ZA GORIVO", "VRAĆANJE PALETA", "NADOMESTILO ZA POBIRANJE KUPNINE"],
+                    "Iznos": [uk_naplaceni_transport_val, uk_naplaceno_gorivo_val, palete_val, cod_val]
+                })
+                st.altair_chart(
+                    __import__("altair").Chart(df_usluge_chart).mark_arc(innerRadius=60).encode(
+                        theta=__import__("altair").Theta(field="Iznos", type="quantitative"),
+                        color=__import__("altair").Color(field="Usluga", type="nominal"),
+                        tooltip=["Usluga", "Iznos"]
+                    ).properties(height=350),
+                    use_container_width=True
+                )
+
+            with col_chart2:
+                st.markdown("### Top 10 gradova po trošku")
+                if "Consignee Town" in res_df.columns:
+                    top_gradovi = res_df.groupby("Consignee Town")["Sveukupno Naplaćeno (€)"].sum().reset_index()
+                    top_gradovi = top_gradovi.sort_values(by="Sveukupno Naplaćeno (€)", ascending=False).head(10)
+                    
+                    st.altair_chart(
+                        __import__("altair").Chart(top_gradovi).mark_bar().encode(
+                            x=__import__("altair").X("Sveukupno Naplaćeno (€):Q", title="Trošak (€)"),
+                            y=__import__("altair").Y("Consignee Town:N", sort="-x", title="Grad"),
+                            tooltip=["Consignee Town", "Sveukupno Naplaćeno (€)"]
+                        ).properties(height=350),
+                        use_container_width=True
+                    )
+                else:
+                    st.info("Podatak o gradu primatelja (Consignee Town) nije pronađen u tablici.")
