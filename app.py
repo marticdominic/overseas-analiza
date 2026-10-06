@@ -49,7 +49,7 @@ except Exception as e:
 
 st.title("📦 Sustav za Kontrolu i Analizu Logističkih Računa")
 st.write(
-    "Automatska kontrola troškova prijevoza, dodataka za gorivo i povrata paleta prema ugovornim uvjetima."
+    "Automatska kontrola troškova prijevoza, dodataka za gorivo i dodatnih usluga prema ugovornim uvjetima."
 )
 
 
@@ -597,7 +597,7 @@ if uploaded_file is not None:
             red_podataka["Sveukupno Očekivano (€)"] = round(
                 očekivano_sveukupno, 2
             )
-            red_podataka["Ima Dodatnih Usluga"] = postoji_dodatna_naplata
+            red_podataka["Ima Dodatnych Usluga"] = postoji_dodatna_naplata
 
             rezultati.append(red_podataka)
 
@@ -854,7 +854,6 @@ if uploaded_file is not None:
         with tab7:
             st.subheader("📊 Vizualna Analitika i Pregled Fakture")
             
-            # Izračun vrijednosti za KPI kartice
             uk_bez_pdv = sveukupno_naplaceno_racun
             pdv_iznos = uk_bez_pdv * 0.25
             uk_s_pdv = uk_bez_pdv + pdv_iznos
@@ -871,15 +870,22 @@ if uploaded_file is not None:
             col_chart1, col_chart2 = st.columns(2)
 
             with col_chart1:
-                st.markdown("### Troškovi po vrsti usluge")
-                # Priprema podataka za krafna / pie chart
-                palete_val = res_df["RTSC - Naplaćeno (€)"].sum() if "RTSC - Naplaćeno (€)" in res_df.columns else 0.0
-                cod_val = res_df["CODC - Naplaćeno (€)"].sum() if "CODC - Naplaćeno (€)" in res_df.columns else 0.0
+                st.markdown("### Troškovi po vrsti usluge (Zasebno)")
                 
-                df_usluge_chart = pd.DataFrame({
-                    "Usluga": ["PRIJEVOZ POŠILJAKA - EXPRESS", "DODATEK - ZA GORIVO", "VRAĆANJE PALETA", "NADOMESTILO ZA POBIRANJE KUPNINE"],
-                    "Iznos": [uk_naplaceni_transport_val, uk_naplaceno_gorivo_val, palete_val, cod_val]
-                })
+                usluge_podaci = [
+                    {"Usluga": "PRIJEVOZ - EXPRESS", "Iznos": uk_naplaceni_transport_val},
+                    {"Usluga": "DODATAK ZA GORIVO", "Iznos": uk_naplaceno_gorivo_val}
+                ]
+                
+                for usluga in usluge_lista:
+                    col_name = f"{usluga} - Naplaćeno (€)"
+                    if col_name in res_df.columns:
+                        ukupni_iznos_usluge = res_df[col_name].sum()
+                        if ukupni_iznos_usluge > 0:
+                            usluge_podaci.append({"Usluga": usluga, "Iznos": ukupni_iznos_usluge})
+
+                df_usluge_chart = pd.DataFrame(usluge_podaci)
+                
                 st.altair_chart(
                     __import__("altair").Chart(df_usluge_chart).mark_arc(innerRadius=60).encode(
                         theta=__import__("altair").Theta(field="Iznos", type="quantitative"),
