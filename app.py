@@ -634,7 +634,7 @@ if uploaded_file is not None:
             posto_goriva,
         )
 
-        tab1, tab2, tab3, tab4, tab5, tab6, tab7 = st.tabs([
+        tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
             "📊 1. Tranzit i rokovi",
             "⚖️ 2. Usporedba cijena",
             "🚨 3. Preplate",
@@ -642,6 +642,7 @@ if uploaded_file is not None:
             "🛠️ 5. Dodatne usluge",
             "📄 6. PDF Sažetak",
             "📊 7. Vizualna Analitika",
+            "🏙️ 8. Izvještaj po gradovima",
         ])
 
         with tab1:
@@ -911,3 +912,72 @@ if uploaded_file is not None:
                     )
                 else:
                     st.info("Podatak o gradu primatelja (Consignee Town) nije pronađen u tablici.")
+
+        with tab8:
+            st.subheader("🏙️ Izvještaj po gradovima i kupcima (Destinacije)")
+            
+            if "Consignee Town" in res_df.columns and "Consignee Name" in res_df.columns:
+                # 1. Sumarno gore: koliko pošiljaka, mase i troška po gradu
+                st.markdown("### 📊 1. Zbirni izvještaj po gradovima (Suma pošiljaka)")
+                sumarno_gradovi = res_df.groupby("Consignee Town").agg(
+                    Ukupno_Pošiljaka=("Shipment ID", "count"),
+                    Ukupno_Paketa=("Number of Parcels", "sum"),
+                    Ukupna_Masa_kg=("Masa (kg)", "sum"),
+                    Ukupno_Naplaćeno_EUR=("Sveukupno Naplaćeno (€)", "sum"),
+                ).reset_index()
+
+                sumarno_gradovi.rename(columns={
+                    "Consignee Town": "Grad",
+                    "Ukupno_Pošiljaka": "Ukupno pošiljaka",
+                    "Ukupno_Paketa": "Ukupno paketa",
+                    "Ukupna_Masa_kg": "Ukupna masa (kg)",
+                    "Ukupno_Naplaćeno_EUR": "Ukupno naplaćeno (€)"
+                }, inplace=True)
+
+                sumarno_gradovi = sumarno_gradovi.sort_values(by="Ukupno pošiljaka", ascending=False)
+                
+                st.dataframe(sumarno_gradovi, use_container_width=True)
+                st.download_button(
+                    label="📥 Preuzmi Zbirni Izvještaj po Gradovima (Excel)",
+                    data=to_excel(sumarno_gradovi),
+                    file_name="zbirni_izvjestaj_po_gradovima.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+
+                st.markdown("---")
+
+                # 2. Ispod: Kompletni Excel izvještaj po kupcima i gradovima
+                st.markdown("### 📋 2. Detaljni izvještaj po kupcima i gradovima")
+                detaljni_kupci_gradovi = res_df[[
+                    "RedniBroj",
+                    "Consignee Town",
+                    "Consignee Name",
+                    "Shipment ID",
+                    "Reference 1",
+                    "ZIP",
+                    "Zona",
+                    "Masa (kg)",
+                    "Number of Parcels",
+                    "Naplaćeni Transport (€)",
+                    "Naplaćeno Gorivo (€)",
+                    "Naplaćene Dodatne Usluge Ukupno (€)",
+                    "Sveukupno Naplaćeno (€)"
+                ]].copy()
+
+                detaljni_kupci_gradovi.rename(columns={
+                    "Consignee Town": "Grad",
+                    "Consignee Name": "Kupac / Primatelj",
+                    "Number of Parcels": "Broj paketa"
+                }, inplace=True)
+
+                detaljni_kupci_gradovi.sort_values(by=["Grad", "Kupac / Primatelj"], inplace=True)
+
+                st.dataframe(detaljni_kupci_gradovi, use_container_width=True)
+                st.download_button(
+                    label="📥 Preuzmi Detaljni Izvještaj Kupaca po Gradovima (Excel)",
+                    data=to_excel(detaljni_kupci_gradovi),
+                    file_name="detaljni_izvjestaj_kupci_po_gradovima.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                )
+            else:
+                st.warning("U učitanoj tablici nedostaju kolone 'Consignee Town' ili 'Consignee Name'.")
