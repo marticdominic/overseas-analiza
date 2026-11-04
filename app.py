@@ -597,7 +597,7 @@ if uploaded_file is not None:
             red_podataka["Sveukupno Očekivano (€)"] = round(
                 očekivano_sveukupno, 2
             )
-            red_podataka["Ima Dodatnih Usluga"] = postoji_dodatna_naplata
+            red_podataka["Ima Dodatnych Usluga"] = postoji_dodatna_naplata
 
             rezultati.append(red_podataka)
 
@@ -914,12 +914,12 @@ if uploaded_file is not None:
                     st.info("Podatak o gradu primatelja (Consignee Town) nije pronađen u tablici.")
 
         with tab8:
-            st.subheader("🏙️ Izvještaj po gradovima i kupcima (Destinacije)")
+            st.subheader("🏙️ Izvještaj po gradovima, poštanskim brojevima i kupcima")
             
-            if "Consignee Town" in res_df.columns and "Consignee Name" in res_df.columns:
-                # 1. Sumarno gore: koliko pošiljaka, mase i troška po gradu
-                st.markdown("### 📊 1. Zbirni izvještaj po gradovima (Suma pošiljaka)")
-                sumarno_gradovi = res_df.groupby("Consignee Town").agg(
+            if "Consignee Town" in res_df.columns and "Consignee Name" in res_df.columns and "ZIP" in res_df.columns:
+                # 1. Sumarno gore: koliko pošiljaka, mase i troška po gradu i ZIP-u
+                st.markdown("### 📊 1. Zbirni izvještaj po gradovima i poštanskim brojevima")
+                sumarno_gradovi = res_df.groupby(["Consignee Town", "ZIP"]).agg(
                     Ukupno_Pošiljaka=("Shipment ID", "count"),
                     Ukupno_Paketa=("Number of Parcels", "sum"),
                     Ukupna_Masa_kg=("Masa (kg)", "sum"),
@@ -928,6 +928,7 @@ if uploaded_file is not None:
 
                 sumarno_gradovi.rename(columns={
                     "Consignee Town": "Grad",
+                    "ZIP": "Poštanski broj",
                     "Ukupno_Pošiljaka": "Ukupno pošiljaka",
                     "Ukupno_Paketa": "Ukupno paketa",
                     "Ukupna_Masa_kg": "Ukupna masa (kg)",
@@ -938,23 +939,23 @@ if uploaded_file is not None:
                 
                 st.dataframe(sumarno_gradovi, use_container_width=True)
                 st.download_button(
-                    label="📥 Preuzmi Zbirni Izvještaj po Gradovima (Excel)",
+                    label="📥 Preuzmi Zbirni Izvještaj po Gradovima i ZIP-u (Excel)",
                     data=to_excel(sumarno_gradovi),
-                    file_name="zbirni_izvjestaj_po_gradovima.xlsx",
+                    file_name="zbirni_izvjestaj_po_gradovima_i_zipu.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
 
                 st.markdown("---")
 
-                # 2. Ispod: Kompletni Excel izvještaj po kupcima i gradovima
-                st.markdown("### 📋 2. Detaljni izvještaj po kupcima i gradovima")
+                # 2. Ispod: Kompletni Excel izvještaj po kupcima, gradovima i ZIP-u
+                st.markdown("### 📋 2. Detaljni izvještaj po kupcima, gradovima i poštanskim brojevima")
                 detaljni_kupci_gradovi = res_df[[
                     "RedniBroj",
                     "Consignee Town",
+                    "ZIP",
                     "Consignee Name",
                     "Shipment ID",
                     "Reference 1",
-                    "ZIP",
                     "Zona",
                     "Masa (kg)",
                     "Number of Parcels",
@@ -966,18 +967,19 @@ if uploaded_file is not None:
 
                 detaljni_kupci_gradovi.rename(columns={
                     "Consignee Town": "Grad",
+                    "ZIP": "Poštanski broj",
                     "Consignee Name": "Kupac / Primatelj",
                     "Number of Parcels": "Broj paketa"
                 }, inplace=True)
 
-                detaljni_kupci_gradovi.sort_values(by=["Grad", "Kupac / Primatelj"], inplace=True)
+                detaljni_kupci_gradovi.sort_values(by=["Grad", "Poštanski broj", "Kupac / Primatelj"], inplace=True)
 
                 st.dataframe(detaljni_kupci_gradovi, use_container_width=True)
                 st.download_button(
-                    label="📥 Preuzmi Detaljni Izvještaj Kupaca po Gradovima (Excel)",
+                    label="📥 Preuzmi Detaljni Izvještaj Kupaca po Gradovima i ZIP-u (Excel)",
                     data=to_excel(detaljni_kupci_gradovi),
-                    file_name="detaljni_izvjestaj_kupci_po_gradovima.xlsx",
+                    file_name="detaljni_izvjestaj_kupci_po_gradovima_i_zipu.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
             else:
-                st.warning("U učitanoj tablici nedostaju kolone 'Consignee Town' ili 'Consignee Name'.")
+                st.warning("U učitanoj tablici nedostaju potrebne kolone (Consignee Town, Consignee Name ili ZIP).")
